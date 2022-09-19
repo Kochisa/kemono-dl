@@ -126,7 +126,7 @@ class downloader:
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
 
     def get_post(self, url:str):
-        found = re.search(r'(https://(kemono\.party|coomer\.party)/)(([^/]+)/user/([^/]+)($|/post/[^/]+))', url)
+        found = re.search(r'(https://(beta.kemono\.party|coomer\.party)/)(([^/]+)/user/([^/]+)($|/post/[^/]+))', url)
         if not found:
             logger.error(f"Unable to find url parameters for {url}")
             return
@@ -142,7 +142,7 @@ class downloader:
         if not is_post:
             if self.skip_user(user):
                 return
-        logger.info(f"Downloading posts from {site}.party | {service} | {user['name']} | {user['id']}")
+        logger.info(f"Downloading user {user['name']} [{user['id']}] | {service}")
         chunk = 0
         first = True
         while True:
@@ -292,10 +292,11 @@ class downloader:
         new_post['post_variables']['username'] = user['name']
         new_post['post_variables']['site'] = domain
         new_post['post_variables']['service'] = post['service']
-        new_post['post_variables']['added'] = datetime.datetime.strptime(post['added'], r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if post['added'] else None
-        new_post['post_variables']['updated'] = datetime.datetime.strptime(post['edited'], r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if post['edited'] else None
-        new_post['post_variables']['user_updated'] = datetime.datetime.strptime(user['updated'], r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if user['updated'] else None
-        new_post['post_variables']['published'] = datetime.datetime.strptime(post['published'], r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if post['published'] else None
+        self.fmtTimeByType = lambda x : datetime.datetime.fromtimestamp(x).strftime(self.date_strf_pattern) if type(x) is float else datetime.datetime.strptime(x, r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if type(x) is str else None
+        new_post['post_variables']['added'] = self.fmtTimeByType(post['added'])
+        new_post['post_variables']['updated'] = self.fmtTimeByType(post['edited'])
+        new_post['post_variables']['user_updated'] = self.fmtTimeByType(user['updated'])
+        new_post['post_variables']['published'] = self.fmtTimeByType(post['published'])
 
         new_post['post_path'] = compile_post_path(new_post['post_variables'], self.download_path_template, self.restrict_ascii)
 
@@ -393,7 +394,7 @@ class downloader:
         try:
             # add this to clean post function
             file_variables = {
-                'filename':'json',
+                'filename':'post',
                 'ext':'json'
             }
             file_path = compile_file_path(post['post_path'], post['post_variables'], file_variables, self.other_filename_template, self.restrict_ascii)
@@ -428,15 +429,15 @@ class downloader:
 
         part_file = f"{file['file_path']}.part" if not self.no_part else file['file_path']
 
-        logger.info(f"Downloading: {os.path.split(file['file_path'])[1]}")
+        logger.debug(f"Downloading: {os.path.split(file['file_path'])[1]}")
         logger.debug(f"Downloading from: {file['file_variables']['url']}")
-        logger.debug(f"Downloading to: {part_file}")
+        logger.info(f"Downloading: {part_file}")
 
         # try to resume part file
         resume_size = 0
         if os.path.exists(part_file) and not self.overwrite:
             resume_size = os.path.getsize(part_file)
-            logger.info(f"Trying to resuming partial download | Resume size: {resume_size} bytes")
+            logger.info(f"Trying to resume partial download | Resume size: {resume_size} bytes")
 
         try:
             response = self.session.get(url=file['file_variables']['url'], stream=True, headers={**self.headers,'Range':f"bytes={resume_size}-"}, cookies=self.cookies, timeout=self.timeout)
@@ -470,8 +471,14 @@ class downloader:
                 else:
                     os.rename(part_file, file['file_path'])
                 return
-            logger.error("Incorrect amount of bytes downloaded | Something went so wrong I have no idea what happened | Removing file")
-            os.remove(part_file)
+            logger.error("Incorrect amount of bytes downloaded | Something went so wrong I have no idea what happened | Saving file with suffix in name")
+            # os.remove(part_file)
+            filepath=os.path.splitext(file['file_path'])
+            filepath=filepath[0]+'_statuscode416'+filepath[1]
+            if self.overwrite:
+                os.replace(part_file, filepath)
+            else:
+                os.rename(part_file, filepath)
             self.post_errors += 1
             return
 
@@ -496,7 +503,7 @@ class downloader:
         if not self.simulate:
             if not os.path.exists(os.path.split(file['file_path'])[0]):
                 os.makedirs(os.path.split(file['file_path'])[0])
-            with open(part_file, 'ab') as f:
+            with open(part_file, 'wb' if resume_size == 0 else 'ab') as f:
                 start = time.time()
                 downloaded = resume_size
                 for chunk in response.iter_content(chunk_size=1024*1024):
@@ -510,13 +517,24 @@ class downloader:
             logger.debug(f"Local File hash: {local_hash}")
             logger.debug(f"Sever File hash: {file['file_variables']['hash']}")
             if local_hash != file['file_variables']['hash']:
-                logger.warning(f"File hash did not match server! | Retrying")
-                if retry > 0:
-                    self.download_file(file, retry=retry-1)
+                if file['file_variables']['hash'] !=None:
+                    logger.warning(f"File hash did not match server! | Retrying")
+                    os.remove(part_file)
+                    if retry > 0:
+                        self.download_file(file, retry=retry-1)
+                        return
+                    logger.error(f"File hash did not match server! | All retries failed")
+                    self.post_errors += 1
                     return
-                logger.error(f"File hash did not match server! | All retries failed")
-                self.post_errors += 1
-                return
+                else:
+                    logger.warning(f"No hash from server! | Saving file with suffix in name")
+                    filepath=os.path.splitext(file['file_path'])
+                    filepath=filepath[0]+'_noserverhash'+filepath[1]
+                    if self.overwrite:
+                        os.replace(part_file, filepath)
+                    else:
+                        os.rename(part_file, filepath)
+                    return
             # remove .part from file name
             if self.overwrite:
                 os.replace(part_file, file['file_path'])
@@ -532,18 +550,18 @@ class downloader:
     def load_archive(self):
         # load archived posts
         if self.archive_file and os.path.exists(self.archive_file):
-            with open(self.archive_file,'r') as f:
+            with open(self.archive_file,'r', encoding="utf-8") as f:
                 self.archive_list = f.read().splitlines()
 
     def write_archive(self, post:dict):
         if self.archive_file and self.post_errors == 0 and not self.simulate:
-            with open(self.archive_file,'a') as f:
-                f.write("https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) + '\n')
+            with open(self.archive_file,'a', encoding="utf-8") as f:
+                f.write("{service} {username}({user_id}) {title} ({id})".format(**post['post_variables']) + '\n')
 
     def skip_user(self, user:dict):
         # check last update date
         if self.user_up_datebefore or self.user_up_dateafter:
-            if check_date(datetime.datetime.strptime(user['updated'], r'%a, %d %b %Y %H:%M:%S %Z'), None, self.user_up_datebefore, self.user_up_dateafter):
+            if check_date(self.fmtTimeByType(user['updated']), None, self.user_up_datebefore, self.user_up_dateafter):
                 logger.info("Skipping user | user updated date not in range")
                 return True
         return False
@@ -551,7 +569,7 @@ class downloader:
     def skip_post(self, post:dict):
         # check if the post should be downloaded
         if self.archive_file:
-            if "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) in self.archive_list:
+            if "{service} {username}({user_id}) {title} ({id})".format(**post['post_variables']) in self.archive_list:
                 logger.info("Skipping post | post already archived")
                 return True
 
