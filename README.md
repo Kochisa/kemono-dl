@@ -1,3 +1,8 @@
+修改自用的kemono-dl  文件层级修改为 赞助/user/post/file
+user = ID
+post = YYYY-MM-DD PostName
+file = 数列顺序写入
+
 # kemono-dl
 A downloader tool for kemono.party and coomer.party.
 
@@ -80,15 +85,15 @@ Set all file and folder names to be limited to only the ascii character set.
 
 `--archive FILE`  
 Only download posts that are not recorded in the archive file.  
-`--date YYYYMMDD`  
+`--date YYYY-MM-DD`  
 Only download posts published from this date.  
-`--datebefore YYYYMMDD`  
+`--datebefore YYYY-MM-DD`  
 Only download posts published before this date.  
-`--dateafter YYYYMMDD`  
+`--dateafter YYYY-MM-DD`  
 Only download posts published after this date.  
-`--user-updated-datebefore YYYYMMDD`  
+`--user-updated-datebefore YYYY-MM-DD`  
 Only download user posts if the user was updated before this date.  
-`--user-updated-dateafter YYYYMMDD`  
+`--user-updated-dateafter YYYY-MM-DD`  
 Only download user posts if the user was updated after this date.  
 `--min-filesize SIZE`  
 Only download attachments or inline images with greater than this file size. (ex #gb | #mb | #kb | #b)  
