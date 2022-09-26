@@ -1,7 +1,7 @@
-修改自用的kemono-dl  文件层级修改为 赞助/user/post/file
-user = ID
-post = YYYY-MM-DD PostName
-file = 数列顺序写入
+修改自用的kemono-dl  文件层级修改为 赞助/user/post/file  
+user = ID  
+post = YYYY-MM-DD PostName  
+file = 数列顺序写入  
 
 # kemono-dl
 A downloader tool for kemono.party and coomer.party.
