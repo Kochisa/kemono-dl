@@ -5,7 +5,7 @@ import time
 
 def parse_url(url):
     # parse urls
-    downloadable = re.search(r'^https://(beta.kemono\.party|coomer\.party)/([^/]+)/user/([^/]+)($|/post/([^/]+)$)',url)
+    downloadable = re.search(r'^https://(kemono\.party|coomer\.party)/([^/]+)/user/([^/]+)($|/post/([^/]+)$)',url)
     if not downloadable:
         return None
     return downloadable.group(1)
