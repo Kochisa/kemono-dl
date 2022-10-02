@@ -1,5 +1,6 @@
 # EDIT
 修改自用的kemono-dl  文件层级修改为 赞助/user/post/file  
+修复原版kemono-dl解析错误 图片404 无法拉取列表错误  
 user = ID  
 post = YYYY-MM-DD PostName  
 file = 数列顺序写入  
