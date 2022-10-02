@@ -239,7 +239,8 @@ class downloader:
                 'ext': file_extension[1:],
                 'url': f"https://{post['post_variables']['site']}/data{inline_image['src']}",
                 'hash': file_hash,
-                'index': f"{index + 1}".zfill(len(str(len(inline_images))))
+                'index': f"{index + 1}".zfill(len(str(len(inline_images)))),
+                'referer': f"https://{post['post_variables']['site']}/{post['post_variables']['service']}/user/{post['post_variables']['user_id']}/post/{post['post_variables']['id']}"
             }
             file['file_path'] = compile_file_path(post['post_path'], post['post_variables'], file['file_variables'], self.inline_filename_template, self.restrict_ascii)
             # set local image location in html
@@ -316,7 +317,8 @@ class downloader:
                     'ext': file_extension[1:],
                     'url': f"https://{domain}/data{attachment['path']}?f={attachment['name']}",
                     'hash': file_hash,
-                    'index': f"{index + 1}".zfill(len(str(len(post['attachments']))))
+                    'index': f"{index + 1}".zfill(len(str(len(post['attachments'])))),
+                    'referer': f"https://{domain}/{post['service']}/user/{post['user']}/post/{post['id']}"
                 }
                 file['file_path'] = compile_file_path(new_post['post_path'], new_post['post_variables'], file['file_variables'], self.filename_template, self.restrict_ascii)
                 new_post['attachments'].append(file)
