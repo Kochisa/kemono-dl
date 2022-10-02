@@ -8,7 +8,7 @@ import datetime
 from PIL import Image
 from io import BytesIO
 import json
-from numbers import Number
+
 from .args import get_args
 from .logger import logger
 from .version import __version__
@@ -83,7 +83,7 @@ class downloader:
         self.post_timeout = args['post_timeout']
         self.simulate = args['simulate']
 
-        self.session = RefererSession()
+        self.session = requests.Session()
         retries = Retry(
             total=self.retry,
             backoff_factor=0.1,
@@ -293,10 +293,10 @@ class downloader:
         new_post['post_variables']['site'] = domain
         new_post['post_variables']['service'] = post['service']
         self.fmtTimeByType = lambda x : datetime.datetime.fromtimestamp(x).strftime(self.date_strf_pattern) if type(x) is float else datetime.datetime.strptime(x, r'%a, %d %b %Y %H:%M:%S %Z').strftime(self.date_strf_pattern) if type(x) is str else None
-        new_post['post_variables']['added'] = self.format_time_by_type(post['added']) if post['added'] else None
-        new_post['post_variables']['updated'] = self.format_time_by_type(post['edited']) if post['edited'] else None
-        new_post['post_variables']['user_updated'] = self.format_time_by_type(user['updated']) if user['updated'] else None
-        new_post['post_variables']['published'] = self.format_time_by_type(post['published']) if post['published'] else None
+        new_post['post_variables']['added'] = self.fmtTimeByType(post['added'])
+        new_post['post_variables']['updated'] = self.fmtTimeByType(post['edited'])
+        new_post['post_variables']['user_updated'] = self.fmtTimeByType(user['updated'])
+        new_post['post_variables']['published'] = self.fmtTimeByType(post['published'])
 
         new_post['post_path'] = compile_post_path(new_post['post_variables'], self.download_path_template, self.restrict_ascii)
 
@@ -420,7 +420,7 @@ class downloader:
                     json.dump(file_content, f, indent=4, sort_keys=True)
             else:
                 with open(file_path,'wb') as f:
-                    f.write(file_content.encode("utf-8"))
+                    f.write(file_content.encode("utf-16"))
 
     def download_file(self, file:dict, retry:int):
         # download a file
@@ -472,11 +472,13 @@ class downloader:
                     os.rename(part_file, file['file_path'])
                 return
             logger.error("Incorrect amount of bytes downloaded | Something went so wrong I have no idea what happened | Saving file with suffix in name")
-            # attempt to keep this file
-            filepath = os.path.splitext(file['file_path'])
-            filepath = filepath[0] + '_statuscode416' + filepath[1]
-            # assume broken file, replace directly
-            os.replace(part_file, filepath)
+            # os.remove(part_file)
+            filepath=os.path.splitext(file['file_path'])
+            filepath=filepath[0]+'_statuscode416'+filepath[1]
+            if self.overwrite:
+                os.replace(part_file, filepath)
+            else:
+                os.rename(part_file, filepath)
             self.post_errors += 1
             return
 
@@ -559,7 +561,7 @@ class downloader:
     def skip_user(self, user:dict):
         # check last update date
         if self.user_up_datebefore or self.user_up_dateafter:
-            if check_date(self.get_date_by_type(user['updated']), None, self.user_up_datebefore, self.user_up_dateafter):
+            if check_date(self.fmtTimeByType(user['updated']), None, self.user_up_datebefore, self.user_up_dateafter):
                 logger.info("Skipping user | user updated date not in range")
                 return True
         return False
@@ -575,7 +577,7 @@ class downloader:
             if not post['post_variables']['published']:
                 logger.info("Skipping post | post published date not in range")
                 return True
-            elif check_date(self.get_date_by_type(post['post_variables']['published']), self.date, self.datebefore, self.dateafter):
+            elif check_date(datetime.datetime.strptime(post['post_variables']['published'], self.date_strf_pattern), self.date, self.datebefore, self.dateafter):
                 logger.info("Skipping post | post published date not in range")
                 return True
 
@@ -589,16 +591,7 @@ class downloader:
         # check if file exists
         if not self.overwrite:
             if os.path.exists(file['file_path']):
-                confirm_msg = ''
-                if 'hash' in file['file_variables'] and file['file_variables']['hash'] != '':
-                    local_hash = get_file_hash(file['file_path'])
-                    if local_hash != file['file_variables']['hash']:
-                        logger.warning(f"Corrupted file detected, remove this file and try to redownload | path: {file['file_path']} " + 
-                                        f"local hash: {local_hash} server hash: {file['file_variables']['hash']}")
-                        os.remove(file['file_path'])
-                        return False
-                    confirm_msg = ' hash confirmed'
-                logger.info(f"Skipping: {os.path.split(file['file_path'])[1]} | File already exists{confirm_msg}")
+                logger.info(f"Skipping: {os.path.split(file['file_path'])[1]} | File already exists")
                 return True
 
         # check file name extention
@@ -690,21 +683,6 @@ class downloader:
                 self.get_post(url)
             except:
                 logger.exception(f"Unable to get posts for {url}")
-
-    def get_date_by_type(self, time):
-        if isinstance(time, Number):
-            t = datetime.datetime.fromtimestamp(time)
-        elif isinstance(time, str):
-            t = datetime.datetime.strptime(time, r'%a, %d %b %Y %H:%M:%S %Z')
-        elif time == None:
-            return None
-        else:
-            raise Exception(f'Can not format time {time}')
-        return t
-
-    def format_time_by_type(self, time):
-        t = self.get_date_by_type(time)
-        return t.strftime(self.date_strf_pattern) if t != None else t
 
 def main():
     downloader(get_args())
