@@ -142,7 +142,7 @@ class downloader:
         if not is_post:
             if self.skip_user(user):
                 return
-        logger.info(f"Downloading user {user['name']} [{user['id']}] | {service}")
+        logger.info(f"Downloading posts from {site}.party | {service} | {user['name']} | {user['id']}")
         chunk = 0
         first = True
         while True:
@@ -221,7 +221,7 @@ class downloader:
         dms_soup = page_soup.find("div", {"class": "card-list__items"})
         file_variables = {
             'filename':'direct messages',
-            'ext':'txt'
+            'ext':'html'
         }
         file_path = compile_file_path(post['post_path'], post['post_variables'], file_variables, self.user_filename_template, self.restrict_ascii)
         self.write_to_file(file_path, dms_soup.prettify())
@@ -279,7 +279,7 @@ class downloader:
         post['content']['text'] = f"{content_soup}\n{embed}\n{comment_soup}"
         post['content']['file_variables'] = {
             'filename':'content',
-            'ext':'txt'
+            'ext':'html'
         }
         post['content']['file_path'] = compile_file_path(post['post_path'], post['post_variables'], post['content']['file_variables'], self.other_filename_template, self.restrict_ascii)
 
@@ -396,7 +396,7 @@ class downloader:
         try:
             # add this to clean post function
             file_variables = {
-                'filename':'post',
+                'filename':'json',
                 'ext':'json'
             }
             file_path = compile_file_path(post['post_path'], post['post_variables'], file_variables, self.other_filename_template, self.restrict_ascii)
@@ -431,18 +431,18 @@ class downloader:
 
         part_file = f"{file['file_path']}.part" if not self.no_part else file['file_path']
 
-        logger.debug(f"Downloading: {os.path.split(file['file_path'])[1]}")
+        logger.info(f"Downloading: {os.path.split(file['file_path'])[1]}")
         logger.debug(f"Downloading from: {file['file_variables']['url']}")
-        logger.info(f"Downloading: {part_file}")
+        logger.debug(f"Downloading to: {part_file}")
 
         # try to resume part file
         resume_size = 0
         if os.path.exists(part_file) and not self.overwrite:
             resume_size = os.path.getsize(part_file)
-            logger.info(f"Trying to resume partial download | Resume size: {resume_size} bytes")
+            logger.info(f"Trying to resuming partial download | Resume size: {resume_size} bytes")
 
         try:
-            response = self.session.get(url=file['file_variables']['url'], stream=True, headers={**self.headers,'Range':f"bytes={resume_size}-"}, cookies=self.cookies, timeout=self.timeout)
+            response = self.session.get(url=file['file_variables']['url'], stream=True, headers={**self.headers,'Range':f"bytes={resume_size}-", 'Referer':file['file_variables']['referer']}, cookies=self.cookies, timeout=self.timeout)
         except:
             logger.exception(f"Failed to get responce: {file['file_variables']['url']} | Retrying")
             if retry > 0:
@@ -552,13 +552,13 @@ class downloader:
     def load_archive(self):
         # load archived posts
         if self.archive_file and os.path.exists(self.archive_file):
-            with open(self.archive_file,'r', encoding="utf-8") as f:
+            with open(self.archive_file,'r') as f:
                 self.archive_list = f.read().splitlines()
 
     def write_archive(self, post:dict):
         if self.archive_file and self.post_errors == 0 and not self.simulate:
-            with open(self.archive_file,'a', encoding="utf-8") as f:
-                f.write("{service} {username}({user_id}) {title} ({id})".format(**post['post_variables']) + '\n')
+            with open(self.archive_file,'a') as f:
+                f.write("https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) + '\n')
 
     def skip_user(self, user:dict):
         # check last update date
@@ -571,7 +571,7 @@ class downloader:
     def skip_post(self, post:dict):
         # check if the post should be downloaded
         if self.archive_file:
-            if "{service} {username}({user_id}) {title} ({id})".format(**post['post_variables']) in self.archive_list:
+            if "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) in self.archive_list:
                 logger.info("Skipping post | post already archived")
                 return True
 
