@@ -8,12 +8,25 @@ import datetime
 from PIL import Image
 from io import BytesIO
 import json
+import threading
 
 from .args import get_args
 from .logger import logger
 from .version import __version__
 from .helper import get_file_hash, print_download_bar, check_date, parse_url, compile_post_path, compile_file_path
 from .my_yt_dlp import my_yt_dlp
+
+class DownloaderThread(threading.Thread):
+    def __init__(self, url, downloader):
+        threading.Thread.__init__(self)
+        self.url = url
+        self.downloader = downloader
+
+    def run(self):
+        try:
+            self.downloader.get_post(self.url)
+        except:
+            logger.exception(f"Unable to get posts for {self.url}")
 
 class downloader:
 
@@ -679,6 +692,15 @@ class downloader:
                 self.get_favorites('coomer.party', 'artist', self.c_fav_users)
             except:
                 logger.exception("Unable to get favorite users from coomer.party")
+
+        threads = []
+        for url in urls:
+            thread = DownloaderThread(url, self)
+            thread.start()
+            threads.append(thread)
+        
+        for thread in threads:
+            thread.join()
 
         for url in urls:
             try:
