@@ -4,6 +4,7 @@
 user = ID  
 post = YYYY-MM-DD PostName  
 file = 数列顺序写入  
+添加多线程下载功能  
 
 本来之前替换源为beta.kemono.party的，但是目前看起来beta出了点问题，重新改回原链接。  
 
