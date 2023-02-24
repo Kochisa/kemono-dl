@@ -647,7 +647,8 @@ class downloader:
 
         urls = []
         domains = []
-
+        threads = []
+        
         for url in self.input_urls:
             domain = parse_url(url)
             if not domain:
@@ -693,20 +694,14 @@ class downloader:
             except:
                 logger.exception("Unable to get favorite users from coomer.party")
 
-        threads = []
-        for url in urls:
+
+        for url in self.input_urls:
             thread = DownloaderThread(url, self)
             thread.start()
             threads.append(thread)
         
         for thread in threads:
             thread.join()
-
-        for url in urls:
-            try:
-                self.get_post(url)
-            except:
-                logger.exception(f"Unable to get posts for {url}")
 
 def main():
     downloader(get_args())
